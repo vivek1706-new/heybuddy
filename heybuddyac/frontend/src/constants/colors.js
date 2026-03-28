@@ -1,0 +1,15 @@
+export const C = {
+    gold: '#C9A84C',
+    goldL: '#E8D48B',
+    dark: '#0A0A0A',
+    card: '#141414',
+    surf: '#1A1A1A',
+    brd: '#2A2A2A',
+    txt: '#FFFFFF',
+    sec: '#9CA3AF',
+    mut: '#6B7280',
+    grn: '#22C55E',
+    red: '#EF4444',
+    org: '#F59E0B',
+    blu: '#3B82F6',
+};

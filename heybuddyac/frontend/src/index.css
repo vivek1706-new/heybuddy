@@ -1,0 +1,41 @@
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background-color: #0A0A0A;
+  color: #FFFFFF;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button, input, textarea {
+  font-family: inherit;
+}
+
+.cat-card:hover, .path-card:hover, .prod-card:hover, .dd-item:hover {
+  border-color: #C9A84C !important;
+  transition: all 0.2s ease;
+}
+
+.dd-item:hover {
+  background: rgba(201, 168, 76, 0.05) !important;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: #141414;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2A2A2A;
+  border-radius: 10px;
+}
