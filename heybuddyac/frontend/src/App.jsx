@@ -17,9 +17,16 @@ import AgentDash from './pages/agent/AgentDashboard';
 
 import { useApp } from './store/AppContext';
 import { C } from './constants/colors';
+import AdminPortal from './pages/admin/AdminPortal';
 
 function App() {
   const { mode, scr, agentLoggedIn, agentOnboarded } = useApp();
+
+  // Secure Back-Office Routing
+  const isAdmin = window.location.hash === '#admin';
+  if (isAdmin) {
+    return <AdminPortal />;
+  }
 
   function BuyerRouter() {
     switch (scr) {
