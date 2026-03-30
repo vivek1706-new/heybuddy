@@ -18,20 +18,70 @@ export default function Confirm() {
     useState(() => {
         async function save() {
             if (!buyer?.id || saved) return;
-            const { data: req } = await supabase.from('requirements').insert({
+
+            // 1. Map String Location to Locality Master UUID
+            const areaName = loc.split(',')[0]; // Grabs "Sector 15" from "Sector 15, Noida, India"
+            const { data: locData } = await supabase
+                .from('locality_master')
+                .select('id')
+                .ilike('name', `%${areaName}%`)
+                .limit(1);
+            const localityId = locData?.[0]?.id || null;
+
+            // 2. Map Brand to Brand Master UUID
+            const brandGuess = prods[0]?.name?.split(' ')[0] || 'LG';
+            const { data: brandData } = await supabase
+                .from('brand_master')
+                .select('id')
+                .ilike('name', brandGuess)
+                .limit(1);
+            const brandId = brandData?.[0]?.id || null;
+
+            // 3. Insert Requirement
+            // 3. Insert Requirement
+            const { data: req, error } = await supabase.from('requirements').insert({
                 buyer_id: buyer.id,
                 category: cat?.name || '',
                 location: loc,
+                locality_id: localityId,
+                brand_id: brandId,
                 products: prods,
                 status: 'active',
             }).select().single();
 
-            // Create marketplace lead
             if (req) {
+                // 4. Trigger Hyper-Local Distribution Algorithm!
+                await supabase.rpc('distribute_lead_to_dealers', { p_req_id: req.id, p_limit: 5 });
+
+                // 5. Fetch Matched Emails and Fire API!
+                const { data: assignments } = await supabase
+                    .from('lead_assignments')
+                    .select('agent_id, agents(email)')
+                    .eq('requirement_id', req.id);
+
+                const dealerEmails = assignments?.map(a => a.agents?.email).filter(e => e) || [];
+
+                if (dealerEmails.length > 0) {
+                    await fetch('/api/send-lead-email', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            dealerEmails,
+                            buyerPhone: ph,
+                            leadDetails: {
+                                category: cat?.name || 'Category',
+                                brand: prods[0]?.name?.split(' ')[0] || 'Requested Brand',
+                                location: loc
+                            }
+                        })
+                    }).catch(err => console.error("Email trigger failed:", err));
+                }
+
+                // (Fallback) Create public marketplace lead
                 await supabase.from('marketplace_leads').insert({
                     requirement_id: req.id,
                     category: cat?.name || '',
-                    area: loc.split(',')[0],
+                    area: areaName,
                     model: prods.map(p => p.name).join(', '),
                     budget: prods[0]?.price || '',
                     cost: cat?.cost || 100,
@@ -40,7 +90,7 @@ export default function Confirm() {
                 // Notification for buyer
                 await supabase.from('notifications').insert({
                     buyer_id: buyer.id,
-                    text: `Request sent to ${5 + extraIds.length} stores for ${cat?.name}`,
+                    text: `Request sent to local dealers via hyper-local engine for ${cat?.name}`,
                 });
             }
             setSaved(true);

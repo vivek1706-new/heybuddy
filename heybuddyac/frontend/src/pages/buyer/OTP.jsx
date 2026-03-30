@@ -14,21 +14,6 @@ export default function OTP() {
     const [loading, setLoading] = useState(false);
     const [demoOtp, setDemoOtp] = useState(tempOtp || mockOtp);
 
-    // Fetch the latest OTP for this phone to display on screen (demo mode)
-    useEffect(() => {
-        async function fetchOtp() {
-            const { data } = await supabase
-                .from('otps')
-                .select('otp')
-                .eq('phone', ph)
-                .eq('used', false)
-                .order('created_at', { ascending: false })
-                .limit(1);
-            if (data && data.length > 0) setDemoOtp(data[0].otp);
-        }
-        if (ph) fetchOtp();
-    }, [ph]);
-
     useEffect(() => {
         if (timer > 0) {
             const t = setTimeout(() => setTimer(timer - 1), 1000);
@@ -106,7 +91,12 @@ export default function OTP() {
             </div>
 
             {/* Demo OTP display */}
-            {/* In production, the OTP is sent via SMS. We no longer show the demo box here. */}
+            {demoOtp && (
+                <div style={{ background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 8, padding: '10px 16px', textAlign: 'center', marginBottom: 16 }}>
+                    <p style={{ fontSize: 12, color: '#ad6800', margin: '0 0 4px' }}>Test mode — OTP</p>
+                    <p style={{ fontSize: 28, fontWeight: 700, letterSpacing: 8, color: '#ad6800', margin: 0 }}>{demoOtp}</p>
+                </div>
+            )}
             <p style={{ color: C.sec, fontSize: 13, textAlign: 'center', marginBottom: 32 }}>
                 Enter the 4-digit code sent to your phone
             </p>
