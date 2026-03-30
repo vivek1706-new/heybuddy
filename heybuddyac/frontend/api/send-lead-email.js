@@ -61,7 +61,7 @@ export default async function handler(req, res) {
     try {
         // Send the email to the array of dealers
         const { data, error } = await resend.emails.send({
-            from: 'HeyBuddy Leads <onboarding@resend.dev>', // Free tier Resend sender address
+            from: 'HeyBuddy Alerts <no-reply@heybuddy.chat>', // Using your newly verified custom domain!
             to: dealerEmails, // Array of emails or a single email string
             subject: '🚨 New Lead Match: ' + leadDetails.category + ' in ' + leadDetails.location,
             html: htmlTemplate,
