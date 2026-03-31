@@ -25,22 +25,12 @@ export default function Confirm() {
         try {
             const finalLocalityId = localityId;
 
-            // 2. Map Brand to Brand Master UUID
-            const brandGuess = prods[0]?.name?.split(' ')[0] || 'LG';
-            const { data: brandData } = await supabase
-                .from('brand_master')
-                .select('id')
-                .ilike('name', brandGuess)
-                .limit(1);
-            const brandId = brandData?.[0]?.id || null;
-
-            // 3. Insert Requirement
+            // 2. Insert Requirement
             const { data: req, error: reqErr } = await supabase.from('requirements').insert({
                 buyer_id: buyer.id,
                 category: cat?.name || '',
                 location: loc,
                 lmterfnum: finalLocalityId,
-                brand_id: brandId,
                 products: prods,
                 status: 'active',
             }).select().single();
@@ -48,22 +38,48 @@ export default function Confirm() {
             if (reqErr) throw reqErr;
 
             if (req) {
-                // 4. Hyper-Local 5KM Distribution Engine
+                // 4. Hyper-Local Distribution: locality + category + brand
                 let eligibleDealerIds = [];
                 if (finalLocalityId) {
+                    // 4a. Get nearby localities from 5km map
                     const { data: neighbors } = await supabase
                         .from('locality_5km_map')
                         .select('source_lmterfnum')
                         .eq('nearby_lmterfnum', finalLocalityId);
-                    
+
                     const nearIds = (neighbors || []).map(n => n.source_lmterfnum);
                     nearIds.push(finalLocalityId);
 
-                    const { data: matchedAgents } = await supabase
+                    // 4b. Get brand_id from brand_master by guessing brand from product name
+                    const brandGuess = prods[0]?.name?.split(' ')[0] || '';
+                    const { data: brandData } = await supabase
+                        .from('brand_master')
+                        .select('id')
+                        .ilike('name', brandGuess)
+                        .limit(1);
+                    const brandId = brandData?.[0]?.id || null;
+
+                    // 4c. Find agents matching nearby locality + category
+                    let query = supabase
                         .from('agents')
                         .select('id, shop_name, phone, email, area')
-                        .in('lmterfnum', nearIds);
-                    
+                        .in('lmterfnum', nearIds)
+                        .contains('categories', [cat?.id]);
+
+                    // 4d. If brand found, further filter by dealer_brand_mapping
+                    if (brandId) {
+                        const { data: brandMappings } = await supabase
+                            .from('dealer_brand_mapping')
+                            .select('agent_id')
+                            .eq('brand_id', brandId);
+                        const brandAgentIds = (brandMappings || []).map(m => m.agent_id);
+                        if (brandAgentIds.length > 0) {
+                            query = query.in('id', brandAgentIds);
+                        }
+                    }
+
+                    const { data: matchedAgents } = await query;
+
                     setMatchedDealers(matchedAgents || []);
                     eligibleDealerIds = (matchedAgents || []).map(a => a.id);
 
