@@ -106,7 +106,7 @@ export function AppProvider({ children }) {
                 return existing;
             }
             const { data, error } = await supabase.from('agents').insert({
-                phone, shop_name: shopName, area, locality_id: localityId, categories, wallet_balance: walletBalance,
+                phone, shop_name: shopName, area, lmterfnum: localityId, categories, wallet_balance: walletBalance,
             }).select().single();
             if (error) throw error;
             setAgent(data);

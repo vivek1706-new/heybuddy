@@ -39,7 +39,7 @@ export default function Confirm() {
                 buyer_id: buyer.id,
                 category: cat?.name || '',
                 location: loc,
-                locality_id: finalLocalityId,
+                lmterfnum: finalLocalityId,
                 brand_id: brandId,
                 products: prods,
                 status: 'active',
@@ -62,7 +62,7 @@ export default function Confirm() {
                     const { data: matchedAgents } = await supabase
                         .from('agents')
                         .select('id, shop_name, phone, email, area')
-                        .in('locality_id', nearIds);
+                        .in('lmterfnum', nearIds);
                     
                     setMatchedDealers(matchedAgents || []);
                     eligibleDealerIds = (matchedAgents || []).map(a => a.id);
