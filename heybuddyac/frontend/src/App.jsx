@@ -13,6 +13,8 @@ import Confirm from './pages/buyer/Confirm';
 import Profile from './pages/buyer/Profile';
 import QuoteInbox from './pages/buyer/QuoteInbox';
 import SEOLanding from './pages/buyer/SEOLanding';
+import CityPage from './pages/buyer/CityPage';
+import LocalityPage from './pages/buyer/LocalityPage';
 
 import AgentLogin from './pages/agent/AgentLogin';
 import AgentOnboard from './pages/agent/AgentOnboard';
@@ -21,6 +23,7 @@ import AgentDash from './pages/agent/AgentDashboard';
 import { useApp } from './store/AppContext';
 import { C } from './constants/colors';
 import { CATS } from './constants/data';
+import { LOC_BY_SLUG } from './constants/localities';
 import AdminPortal from './pages/admin/AdminPortal';
 
 // SEO route mapping: /air-conditioner-dealers-in-noida -> { catId: 'ac', city: 'Noida' }
@@ -50,6 +53,22 @@ function App() {
 
   // Handle SEO URLs on first load
   useEffect(() => {
+    const path = window.location.pathname.replace(/^\//, '');
+
+    // City page: /dealers-in-noida
+    if (path === 'dealers-in-noida') {
+      setScr('city-noida');
+      return;
+    }
+
+    // Locality page: /sector-62-noida, /alpha-greater-noida, etc.
+    if (LOC_BY_SLUG[path]) {
+      window._seoLocality = LOC_BY_SLUG[path];
+      setScr('locality');
+      return;
+    }
+
+    // Category SEO: /air-conditioner-dealers-in-noida
     const seo = parseSEOPath(window.location.pathname);
     if (seo) {
       const cat = CATS.find(c => c.id === seo.catId);
@@ -81,6 +100,8 @@ function App() {
       case 'profile': return <Profile />;
       case 'quotes': return <QuoteInbox />;
       case 'seo': return <SEOLanding />;
+      case 'city-noida': return <CityPage />;
+      case 'locality': return <LocalityPage locality={window._seoLocality} />;
       default: return <Landing />;
     }
   }
