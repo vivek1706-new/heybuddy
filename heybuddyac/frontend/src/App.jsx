@@ -1,4 +1,5 @@
 // Force redeploy with latest flow: Locality -> Mobile -> OTP -> Model
+import { useEffect } from 'react';
 import Header from './components/layout/Header';
 import Landing from './pages/buyer/Landing';
 import Location from './pages/buyer/Location';
@@ -11,6 +12,7 @@ import Results from './pages/buyer/Results';
 import Confirm from './pages/buyer/Confirm';
 import Profile from './pages/buyer/Profile';
 import QuoteInbox from './pages/buyer/QuoteInbox';
+import SEOLanding from './pages/buyer/SEOLanding';
 
 import AgentLogin from './pages/agent/AgentLogin';
 import AgentOnboard from './pages/agent/AgentOnboard';
@@ -18,10 +20,46 @@ import AgentDash from './pages/agent/AgentDashboard';
 
 import { useApp } from './store/AppContext';
 import { C } from './constants/colors';
+import { CATS } from './constants/data';
 import AdminPortal from './pages/admin/AdminPortal';
 
+// SEO route mapping: /air-conditioner-dealers-in-noida -> { catId: 'ac', city: 'Noida' }
+const SEO_CAT_MAP = {
+  'air-conditioner': 'ac', 'refrigerator': 'fridge', 'television': 'tv',
+  'laptop': 'laptop', 'washing-machine': 'washer', 'smartphone': 'mobile',
+  'water-purifier': 'purifier', 'dishwasher': 'dishwasher',
+};
+const SEO_CITY_MAP = {
+  'noida': 'Noida', 'greater-noida': 'Greater Noida', 'delhi': 'Delhi',
+  'gurgaon': 'Gurgaon', 'ghaziabad': 'Ghaziabad', 'mumbai': 'Mumbai',
+  'bangalore': 'Bangalore', 'hyderabad': 'Hyderabad', 'chennai': 'Chennai',
+  'pune': 'Pune', 'kolkata': 'Kolkata', 'ahmedabad': 'Ahmedabad',
+  'jaipur': 'Jaipur', 'lucknow': 'Lucknow', 'chandigarh': 'Chandigarh',
+};
+
+function parseSEOPath(path) {
+  const clean = path.replace(/^\//, '').replace(/-dealers(-in-(.+))?$/, (_, __, city) => '|' + (city || ''));
+  const [catSlug, citySlug] = clean.split('|');
+  const catId = SEO_CAT_MAP[catSlug];
+  const city = citySlug ? SEO_CITY_MAP[citySlug] : null;
+  return catId ? { catId, city } : null;
+}
+
 function App() {
-  const { mode, scr, agentLoggedIn, agentOnboarded } = useApp();
+  const { mode, scr, setCat, setScr, agentLoggedIn, agentOnboarded } = useApp();
+
+  // Handle SEO URLs on first load
+  useEffect(() => {
+    const seo = parseSEOPath(window.location.pathname);
+    if (seo) {
+      const cat = CATS.find(c => c.id === seo.catId);
+      if (cat) {
+        setCat(cat);
+        setScr('seo');
+        window._seoCity = seo.city;
+      }
+    }
+  }, []);
 
   // Secure Back-Office Routing
   const isAdmin = window.location.hash === '#admin';
@@ -42,6 +80,7 @@ function App() {
       case 'confirm': return <Confirm />;
       case 'profile': return <Profile />;
       case 'quotes': return <QuoteInbox />;
+      case 'seo': return <SEOLanding />;
       default: return <Landing />;
     }
   }
