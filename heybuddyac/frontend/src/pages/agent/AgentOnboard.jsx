@@ -5,32 +5,72 @@ import { CATS } from '../../constants/data';
 import { Ic, catIcon } from '../../components/ui/Icons';
 import { BackButton } from '../../components/ui/Controls';
 import { useApp } from '../../store/AppContext';
+import { supabase } from '../../lib/supabase';
 
 export default function AgentOnboard() {
     const { ph, createAgent, setAgentOnboarded } = useApp();
     const [step, setStep] = useState(0);
     const [shop, setShop] = useState('');
     const [area, setArea] = useState('');
+    const [localityId, setLocalityId] = useState(null);
+    const [dbResults, setDbResults] = useState([]);
+    const [showResults, setShowResults] = useState(false);
     const [cats, setCats] = useState([]);
     const [amt, setAmt] = useState(1000);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
     function tCat(id) {
         setCats(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
     }
 
     async function handleFinish() {
+        if (!shop || !area || cats.length === 0 || !localityId) {
+            setError('Please complete all fields and pick a verified location.');
+            return;
+        }
         setLoading(true);
-        await createAgent({
-            phone: ph,
-            shopName: shop,
-            area,
-            categories: cats,
-            walletBalance: amt,
-        });
-        setAgentOnboarded(true);
-        setLoading(false);
+        setError('');
+        try {
+            const res = await createAgent({
+                phone: ph,
+                shopName: shop,
+                area,
+                localityId,
+                categories: cats,
+                walletBalance: amt,
+            });
+            if (res) {
+                setAgentOnboarded(true);
+            } else {
+                setError('Failed to create account. Try a different number.');
+            }
+        } catch (err) {
+            setError('System error. Please try again later.');
+        } finally {
+            setLoading(false);
+        }
     }
+
+    async function searchLoc(v) {
+        setArea(v);
+        setShowResults(v.length > 2);
+        if (v.length > 2) {
+            const { data } = await supabase
+                .from('unique_localities')
+                .select('*')
+                .ilike('lmtname', `%${v}%`)
+                .limit(5);
+            setDbResults(data || []);
+        }
+    }
+
+    const selectLoc = (item) => {
+        const display = `${item.lmtname}, ${item.city}`;
+        setArea(display);
+        setLocalityId(item.lmterfnum);
+        setShowResults(false);
+    };
 
     if (step === 0) return (
         <div style={{ padding: '32px 20px' }}>
@@ -46,9 +86,26 @@ export default function AgentOnboard() {
                 <input style={sI} placeholder="e.g. Sargam Electronics" value={shop} onChange={e => setShop(e.target.value)} />
             </div>
 
-            <div style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 11, color: C.mut, fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Location</label>
-                <input style={sI} placeholder="e.g. Sector 18, Noida" value={area} onChange={e => setArea(e.target.value)} />
+            <div style={{ marginBottom: 14, position: 'relative' }}>
+                <label style={{ fontSize: 11, color: C.mut, fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Location (Find in Database)</label>
+                <div style={{ ...sI, display: 'flex', alignItems: 'center', padding: '0 12px' }}>
+                    <div style={{ color: C.mut, marginRight: 10 }}>{Ic.loc()}</div>
+                    <input
+                        style={{ border: 'none', background: 'transparent', flex: 1, color: C.white, outline: 'none' }}
+                        placeholder="Search your area..."
+                        value={area}
+                        onChange={e => searchLoc(e.target.value)}
+                    />
+                </div>
+                {showResults && dbResults.length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: C.card, border: `1px solid ${C.brd}`, borderRadius: 8, zIndex: 10, marginTop: 4, maxHeight: 200, overflowY: 'auto' }}>
+                        {dbResults.map(item => (
+                            <div key={item.lmterfnum} onClick={() => selectLoc(item)} style={{ padding: '12px 16px', fontSize: 13, cursor: 'pointer', borderBottom: `1px solid ${C.brd}`, color: C.sec }}>
+                                <b>{item.lmtname}</b>, {item.city}
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             <div style={{ marginBottom: 20 }}>

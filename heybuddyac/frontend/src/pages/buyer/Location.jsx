@@ -4,11 +4,14 @@ import { cd, gB, sI } from '../../constants/styles';
 import { catIcon, Ic } from '../../components/ui/Icons';
 import { BackButton } from '../../components/ui/Controls';
 import { useApp } from '../../store/AppContext';
+import { supabase } from '../../lib/supabase';
 import usePlacesAutocomplete from 'use-places-autocomplete';
 
 export default function Location() {
-    const { loc, setLoc, setScr, cat } = useApp();
+    const { loc, setLoc, setLocalityId, setScr, cat } = useApp();
     const Icon = catIcon[cat?.id];
+    const [dbResults, setDbResults] = useState([]);
+    const [searching, setSearching] = useState(false);
     const googleKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
     const {
@@ -22,13 +25,16 @@ export default function Location() {
         requestOptions: {
             componentRestrictions: { country: 'in' }
         },
-        debounce: 300,
+        debounce: 200,
         initOnMount: false
     });
 
     // Load Google Maps Script Manually (More robust for Vite)
     useEffect(() => {
-        if (!googleKey) return;
+        if (!googleKey) {
+            console.warn("VITE_GOOGLE_MAPS_API_KEY is missing. Google Places will be disabled.");
+            return;
+        }
 
         if (window.google) {
             init();
@@ -42,15 +48,50 @@ export default function Location() {
         document.head.appendChild(script);
 
         script.onload = () => {
-            console.log("Google Maps loaded successfully!");
             init();
         };
+
+        script.onerror = () => {
+            console.error("Google Maps failed to load.");
+        };
     }, [googleKey, init]);
+
+    // DB Search Logic
+    useEffect(() => {
+        if (value.length < 2) {
+            setDbResults([]);
+            return;
+        }
+
+        const runSearch = async () => {
+            setSearching(true);
+            const { data } = await supabase
+                .from('unique_localities')
+                .select('*')
+                .ilike('lmtname', `%${value}%`)
+                .limit(5);
+            setDbResults(data || []);
+            setSearching(false);
+        };
+
+        const timer = setTimeout(runSearch, 200);
+        return () => clearTimeout(timer);
+    }, [value]);
 
     const handleSelect = ({ description }) => () => {
         setValue(description, false);
         clearSuggestions();
         setLoc(description);
+        setLocalityId(null); // Clear ID since it's a Google result
+        setScr('phone');
+    };
+
+    const handleDbSelect = (item) => {
+        const fullLoc = `${item.lmtname}, ${item.city}`;
+        setValue(fullLoc, false);
+        clearSuggestions();
+        setLoc(fullLoc);
+        setLocalityId(item.lmterfnum);
         setScr('phone');
     };
 
@@ -63,9 +104,9 @@ export default function Location() {
                 <span style={{ fontSize: 14, color: C.gold, fontWeight: 600 }}>{cat?.name}</span>
             </div>
 
-            <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px' }}>Where do you stay?</h2>
+            <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px' }}>Locality of residence?</h2>
             <p style={{ color: C.sec, fontSize: 13, margin: '0 0 16px' }}>
-                We will find the best {cat?.name} stores near you
+                We will find the best {cat?.name} stores near your neighborhood
             </p>
 
             <div style={{ position: 'relative', marginBottom: 20 }}>
@@ -86,40 +127,91 @@ export default function Location() {
                     )}
                 </div>
 
-                {/* Pure Google Suggestions */}
-                <div style={{ marginTop: 24 }}>
-                    {status === 'OK' ? (
-                        data.map((suggestion) => (
+                {/* Unified Search Results List */}
+                {(dbResults.length > 0 || status === 'OK') && (
+                    <div style={{ 
+                        marginTop: 10,
+                        background: C.card,
+                        borderRadius: 16,
+                        border: `1px solid ${C.brd}`,
+                        overflow: 'hidden',
+                        boxShadow: '0 10px 40px rgba(0,0,0,0.4)',
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 100,
+                        maxHeight: 400,
+                        overflowY: 'auto'
+                    }}>
+                        {/* 1. Supabase Localities (Primary) */}
+                        {dbResults.map((item) => (
+                            <div
+                                key={item.lmterfnum}
+                                onClick={() => handleDbSelect(item)}
+                                style={{
+                                    padding: '16px 18px',
+                                    cursor: 'pointer',
+                                    borderBottom: `1px solid ${C.brd}`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 12,
+                                    background: 'transparent'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = C.gold + '08'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                            >
+                                <div style={{ color: C.gold, fontSize: 18 }}>{Ic.loc()}</div>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ color: C.white, fontSize: 15, fontWeight: 700 }}>{item.lmtname}</div>
+                                    <div style={{ color: C.sec, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        {item.city} — <span style={{ color: C.gold, fontWeight: 700, fontSize: 10, textTransform: 'uppercase' }}>Verified Local</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+
+                        {/* 2. Google Places (Secondary Fallback) */}
+                        {status === 'OK' && data.map((suggestion) => (
                             <div
                                 key={suggestion.place_id}
                                 onClick={handleSelect(suggestion)}
                                 style={{
-                                    padding: '18px 20px',
-                                    background: C.card,
-                                    borderRadius: 12,
-                                    marginBottom: 12,
+                                    padding: '16px 18px',
                                     cursor: 'pointer',
-                                    border: `1px solid ${C.brd}`,
-                                    transition: '0.2s'
+                                    borderBottom: `1px solid ${C.brd}`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 12,
+                                    background: 'transparent',
+                                    opacity: 0.9
                                 }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = C.white + '05'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                             >
-                                <div style={{ color: C.white, fontSize: 15, fontWeight: 600 }}>{suggestion.structured_formatting.main_text}</div>
-                                <div style={{ color: C.sec, fontSize: 13, marginTop: 4 }}>{suggestion.structured_formatting.secondary_text}</div>
+                                <div style={{ color: C.mut, fontSize: 18 }}>{Ic.loc()}</div>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ color: C.white, fontSize: 14, fontWeight: 600 }}>{suggestion.structured_formatting.main_text}</div>
+                                    <div style={{ color: C.sec, fontSize: 12 }}>{suggestion.structured_formatting.secondary_text}</div>
+                                </div>
+                                <div style={{ fontSize: 10, color: C.mut, textTransform: 'uppercase', fontStyle: 'italic' }}>Global</div>
                             </div>
-                        ))
-                    ) : (
-                        value.length > 2 && status !== 'OK' && (
-                            <div style={{ padding: 40, color: C.mut, textAlign: 'center', fontSize: 13 }}>
-                                Searching for "{value}" in India...
-                            </div>
-                        )
-                    )}
-                </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Loading / No Results state */}
+                {value.length > 1 && dbResults.length === 0 && status !== 'OK' && !searching && (
+                    <div style={{ padding: 40, color: C.mut, textAlign: 'center', fontSize: 13 }}>
+                        {Ic.loc()} <br/> Searching across 1 million verified points...
+                    </div>
+                )}
 
                 {/* Professional helper footer */}
                 {!value && (
-                    <div style={{ marginTop: 60, textAlign: 'center', opacity: 0.4 }}>
-                        <div style={{ color: C.sec, fontSize: 12 }}>Powered by Google Maps</div>
+                    <div style={{ marginTop: 60, textAlign: 'center', opacity: 0.6 }}>
+                        <div style={{ color: C.sec, fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Search Tips:</div>
+                        <div style={{ color: C.mut, fontSize: 12 }}>• Search by area or colony name<br/>• Use sector numbers if in NCR<br/>• Try building names for closer matches</div>
                     </div>
                 )}
             </div>

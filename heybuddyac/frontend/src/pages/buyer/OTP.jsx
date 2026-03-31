@@ -106,15 +106,40 @@ export default function OTP() {
                     <input
                         key={i}
                         id={'otp-' + i}
-                        style={{ ...sI, width: 56, height: 56, textAlign: 'center', fontSize: 24, fontWeight: 700, padding: 0, borderColor: otp[i] ? C.gold : C.brd }}
+                        style={{ 
+                            ...sI, 
+                            width: 56, 
+                            height: 56, 
+                            textAlign: 'center', 
+                            fontSize: 24, 
+                            fontWeight: 700, 
+                            padding: 0, 
+                            borderColor: err ? C.red : (otp[i] ? C.gold : C.brd),
+                            background: err ? C.red + '05' : 'transparent',
+                            transition: 'all 0.2s'
+                        }}
                         maxLength="1"
                         value={otp[i] || ''}
                         onChange={e => handleDigit(i, e.target.value)}
+                        onFocus={() => setErr('')}
                     />
                 ))}
             </div>
 
-            {err && <div style={{ textAlign: 'center', marginBottom: 12, fontSize: 12, color: C.red }}>{err}</div>}
+            {err && (
+                <div style={{ 
+                    textAlign: 'center', 
+                    marginBottom: 16, 
+                    fontSize: 12, 
+                    color: C.red, 
+                    background: C.red + '11', 
+                    padding: '8px 12px', 
+                    borderRadius: 8,
+                    border: `1px solid ${C.red}33`
+                }}>
+                    {err}
+                </div>
+            )}
 
             <button
                 style={{ ...gB, width: '100%', padding: 14, opacity: otp.length === 4 ? 1 : 0.4, pointerEvents: otp.length === 4 ? 'auto' : 'none' }}

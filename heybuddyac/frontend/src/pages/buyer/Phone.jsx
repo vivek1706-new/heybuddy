@@ -9,10 +9,15 @@ export default function Phone() {
     const { cat, loc, setPh, setScr, generateOtp, mockOtp, setTempOtp } = useApp();
     const [phone, setPhone] = useState('');
     const [loading, setLoading] = useState(false);
+    const [err, setErr] = useState(false);
     const Icon = catIcon[cat?.id];
 
     async function handleSend() {
-        if (phone.length !== 10) return;
+        if (phone.length !== 10) {
+            setErr(true);
+            setTimeout(() => setErr(false), 2000);
+            return;
+        }
         setLoading(true);
         // Store OTP in Supabase (shown on screen for demo)
         const code = await generateOtp(phone);
@@ -47,15 +52,16 @@ export default function Phone() {
                 Mobile number
             </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-                <div style={{ ...cd, padding: '12px 14px', fontSize: 14, color: C.sec, flexShrink: 0 }}>+91</div>
+                <div style={{ ...cd, padding: '12px 14px', fontSize: 14, color: C.sec, flexShrink: 0, borderColor: err ? C.red : C.brd }}>+91</div>
                 <input
-                    style={{ ...sI, fontSize: 16, letterSpacing: '0.1em' }}
+                    style={{ ...sI, fontSize: 16, letterSpacing: '0.1em', borderColor: err ? C.red : C.brd }}
                     placeholder="10 digit number"
                     value={phone}
-                    onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    onChange={e => { setPhone(e.target.value.replace(/\D/g, '').slice(0, 10)); setErr(false); }}
                     type="tel"
                 />
             </div>
+            {err && <div style={{ color: C.red, fontSize: 12, textAlign: 'center', marginTop: -16, marginBottom: 16 }}>Please enter a valid 10-digit mobile number</div>}
 
             <button
                 style={{ ...gB, width: '100%', padding: 14, opacity: phone.length === 10 ? 1 : 0.4, pointerEvents: phone.length === 10 ? 'auto' : 'none' }}

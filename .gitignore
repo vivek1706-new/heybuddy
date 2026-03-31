@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+npm-cache-local/
+heybuddyac/frontend/npm-cache-local/
+0-5Kms Locality map - 0-5Kms Locality map.csv

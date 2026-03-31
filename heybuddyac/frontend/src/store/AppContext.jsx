@@ -6,11 +6,13 @@ const AppContext = createContext(null);
 export function AppProvider({ children }) {
     // ── Mode ──────────────────────────────────────────────────────────────────
     const [mode, setMode] = useState('buyer'); // 'buyer' | 'agent'
+    const [err, setErr] = useState(null); // Global error state
 
     // ── Buyer state ───────────────────────────────────────────────────────────
     const [scr, setScr] = useState('landing');
     const [cat, setCat] = useState(null);
     const [loc, setLoc] = useState('Select location');
+    const [localityId, setLocalityId] = useState(null); // Database ID
     const [ph, setPh] = useState('');
     const [tempOtp, setTempOtp] = useState('');
     const [buyer, setBuyer] = useState(null); // DB record
@@ -26,20 +28,22 @@ export function AppProvider({ children }) {
 
     // ── OTP helpers ───────────────────────────────────────────────────────────
     async function generateOtp(phone) {
+        setErr(null);
         const otp = String(1000 + Math.floor(Math.random() * 9000));
 
-        // 1. Record in DB
-        await supabase.from('otps').insert({ phone, otp });
-
-        // 2. Call MSG91 API via our secure Vercel Endpoint
         try {
+            // 1. Record in DB
+            await supabase.from('otps').insert({ phone, otp });
+
+            // 2. Call MSG91 API via our secure Vercel Endpoint
             await fetch('/api/send-otp', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ phone, otp })
             });
-        } catch (err) {
-            console.error('Failed to trigger MSG91 SMS:', err);
+        } catch (error) {
+            console.error('Failed to trigger OTP system:', error);
+            // No error toast here to keep flow smooth (mock is available)
         }
 
         return otp;
@@ -63,13 +67,20 @@ export function AppProvider({ children }) {
 
     // ── Buyer helpers ─────────────────────────────────────────────────────────
     async function getOrCreateBuyer(phone) {
-        const { data: existing } = await supabase
-            .from('buyers').select('*').eq('phone', phone).single();
-        if (existing) { setBuyer(existing); return existing; }
-        const { data: created } = await supabase
-            .from('buyers').insert({ phone }).select().single();
-        setBuyer(created);
-        return created;
+        setErr(null);
+        try {
+            const { data: existing } = await supabase
+                .from('buyers').select('*').eq('phone', phone).single();
+            if (existing) { setBuyer(existing); return existing; }
+            const { data: created } = await supabase
+                .from('buyers').insert({ phone }).select().single();
+            setBuyer(created);
+            return created;
+        } catch (error) {
+            setErr('Database connection error. Please try again.');
+            console.error('getOrCreateBuyer failed:', error);
+            return null;
+        }
     }
 
     async function loadNotifications(buyerId) {
@@ -86,17 +97,25 @@ export function AppProvider({ children }) {
         return data || null;
     }
 
-    async function createAgent({ phone, shopName, area, categories, walletBalance }) {
-        const existing = await getOrCreateAgent(phone);
-        if (existing) {
-            setAgent(existing);
-            return existing;
+    async function createAgent({ phone, shopName, area, localityId, categories, walletBalance }) {
+        setErr(null);
+        try {
+            const existing = await getOrCreateAgent(phone);
+            if (existing) {
+                setAgent(existing);
+                return existing;
+            }
+            const { data, error } = await supabase.from('agents').insert({
+                phone, shop_name: shopName, area, locality_id: localityId, categories, wallet_balance: walletBalance,
+            }).select().single();
+            if (error) throw error;
+            setAgent(data);
+            return data;
+        } catch (error) {
+            setErr('Failed to create agent profile. Try another number.');
+            console.error('createAgent failed:', error);
+            return null;
         }
-        const { data } = await supabase.from('agents').insert({
-            phone, shop_name: shopName, area, categories, wallet_balance: walletBalance,
-        }).select().single();
-        setAgent(data);
-        return data;
     }
 
     async function updateAgentWallet(agentId, delta, type, description) {
@@ -110,10 +129,13 @@ export function AppProvider({ children }) {
 
     // ── Reset buyer flow ──────────────────────────────────────────────────────
     function reset() {
+        setErr(null);
         setScr('landing');
         setCat(null);
-        setLoc('');
+        setLoc('Select location');
+        setLocalityId(null);
         setPh('');
+        setTempOtp('');
         setProds([]);
     }
 
@@ -122,6 +144,7 @@ export function AppProvider({ children }) {
         scr, setScr,
         cat, setCat,
         loc, setLoc,
+        localityId, setLocalityId,
         ph, setPh,
         tempOtp, setTempOtp,
         buyer, setBuyer,
@@ -132,6 +155,7 @@ export function AppProvider({ children }) {
         agentLoggedIn, setAgentLoggedIn,
         agentOnboarded, setAgentOnboarded,
         agent, setAgent,
+        err, setErr,
         // helpers
         generateOtp,
         verifyOtp,
